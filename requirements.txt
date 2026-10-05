@@ -1,8 +1,9 @@
 streamlit==1.32.0
-yfinance
-pandas
-plotly
-google-genai
-requests
-lxml
-matplotlib
+pandas==2.2.3
+numpy==1.26.4
+yfinance==0.2.40
+plotly==5.22.0
+google-genai==0.3.0
+requests==2.31.0
+lxml==5.2.1
+matplotlib==3.8.4
