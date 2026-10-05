@@ -38,18 +38,42 @@ def fetch_data(ticker):
 @st.cache_data(ttl=86400)
 def get_fundamentals(ticker):
     try:
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Referer': 'https://finance.yahoo.com'
-        })
-        t = yf.Ticker(ticker, session=session)
+        t = yf.Ticker(ticker)
+        # Intentamos primero con .info por si la IP tiene suerte
         info = t.info
-        if info and len(info) > 5:
+        if info and len(info) > 5 and ('trailingPE' in info or 'forwardPE' in info or 'netIncomeToCommon' in info):
             return info
-        return {}
+            
+        # Plan B (Anticipando el bloqueo): Extraemos métricas clave de los estados financieros reales
+            
+        fin = t.financials
+        bs = t.balance_sheet
+        
+        data = {}
+        if not fin.empty and not bs.empty:
+            # Tomamos el último año disponible
+            latest_col = fin.columns[0]
+            bs_col = bs.columns[0] if bs.columns[0] in bs.columns else bs.columns[0]
+            
+            net_income = fin.loc['Net Income'].iloc[0] if 'Net Income' in fin.index else 0
+            total_revenue = fin.loc['Total Revenue'].iloc[0] if 'Total Revenue' in fin.index else 1
+            operating_income = fin.loc['Operating Income'].iloc[0] if 'Operating Income' in fin.index else 0
+            
+            total_cash = bs.loc['Cash And Cash Equivalents'].iloc[0] if 'Cash And Cash Equivalents' in bs.index else (bs.loc['Cash Cash Equivalents And Short Term Investments'].iloc[0] if 'Cash Cash Equivalents And Short Term Investments' in bs.index else 0)
+            total_debt = bs.loc['Total Debt'].iloc[0] if 'Total Debt' in bs.index else 0
+            stockholders_equity = bs.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in bs.index else 1
+            total_assets = bs.loc['Total Assets'].iloc[0] if 'Total Assets' in bs.index else 1
+            
+            # Estimaciones derivadas seguras
+            data['netIncomeToCommon'] = net_income
+            data['operatingMargins'] = operating_income / total_revenue if total_revenue else 0
+            data['totalCash'] = total_cash
+            data['totalDebt'] = total_debt
+            data['returnOnEquity'] = net_income / stockholders_equity if stockholders_equity else 0
+            data['returnOnAssets'] = net_income / total_assets if total_assets else 0
+            data['debtToEquity'] = (total_debt / stockholders_equity) * 100 if stockholders_equity else 0
+            
+        return data
     except:
         return {}
 
