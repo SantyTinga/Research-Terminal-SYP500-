@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
+import time
 from google import genai
 from google.genai import types
 
@@ -36,8 +37,16 @@ def fetch_data(ticker):
 
 @st.cache_data(ttl=86400)
 def get_fundamentals(ticker):
-    try: return yf.Ticker(ticker).info
-    except: return {}
+    try:
+        session = requests.Session()
+        session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+        t = yf.Ticker(ticker, session=session)
+        info = t.info
+        if info and ('shortName' in info or 'regularMarketPrice' in info or 'marketCap' in info):
+            return info
+        return {}
+    except:
+        return {}
 
 # --- 3. BARRA LATERAL ---
 with st.sidebar:
@@ -316,6 +325,7 @@ if ticker_input:
                         d = row[1]
                         t = d['Ticker']
                         inf = get_fundamentals(t)
+                        time.sleep(0.3)
                         fs = 0
                         
                         rg = inf.get('revenueGrowth', 0) or 0
