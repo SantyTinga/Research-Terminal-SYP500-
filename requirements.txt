@@ -1,9 +1,7 @@
-streamlit==1.38.0
-pandas==2.2.2
-numpy==1.26.4
-pandas-ta
-yfinance==0.2.40
-plotly==5.22.0
-google-genai==0.3.0
-requests==2.31.0
-lxml==5.2.1
+streamlit
+pandas
+yfinance
+plotly
+google-genai
+requests
+lxml
