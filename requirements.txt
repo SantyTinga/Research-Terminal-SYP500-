@@ -1,7 +1,6 @@
-streamlit
+streamlit==1.32.0
 yfinance
 pandas
-pandas-ta
 plotly
 google-genai
 requests
