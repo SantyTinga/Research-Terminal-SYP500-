@@ -347,4 +347,16 @@ if ticker_input:
                     txt.text("¡Completado!")
                     if res_fin:
                         df_r = pd.DataFrame(res_fin).sort_values('TOTAL SCORE', ascending=False).reset_index(drop=True)
-                        st.dataframe(df_r.style.background_gradient(subset=['TOTAL SCORE'], cmap='Greens'), use_container_width=True)
+                        st.dataframe(
+    df_r,
+    use_container_width=True,
+    column_config={
+        "TOTAL SCORE": st.column_config.ProgressColumn(
+            "TOTAL SCORE",
+            help="Puntaje consolidado (Técnico + Fundamental)",
+            format="%d pts",
+            min_value=0,
+            max_value=100,
+        )
+    }
+)
