@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
 import plotly.graph_objects as go
 from google import genai
 from google.genai import types
@@ -20,10 +19,17 @@ def fetch_data(ticker):
         df.columns = df.columns.get_level_values(0)
         
     df.dropna(inplace=True)
-    df['EMA20'] = ta.ema(df['Close'], length=20)
-    df['EMA50'] = ta.ema(df['Close'], length=50)
-    df['EMA200'] = ta.ema(df['Close'], length=200)
-    df['RSI14'] = ta.rsi(df['Close'], length=14)
+    df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
+    df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
+    
+    delta = df['Close'].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(window=14).mean()
+    avg_loss = loss.rolling(window=14).mean()
+    rs = avg_gain / avg_loss
+    df['RSI14'] = 100 - (100 / (1 + rs))
     df['RVOL'] = df['Volume'] / df['Volume'].rolling(20).mean()
     
     return df.tail(250)
@@ -229,6 +235,7 @@ if ticker_input:
             st.markdown("---")
             total_score = tech_score + fund_score
             st.metric("🏆 OPPORTUNITY SCORE TOTAL", f"{total_score} / 100")
+            
 
         # --- PESTAÑA 3: GEMINI ---
         with tab3:
