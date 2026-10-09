@@ -39,39 +39,56 @@ def fetch_data(ticker):
 def get_fundamentals(ticker):
     try:
         t = yf.Ticker(ticker)
-        # Intentamos primero con .info por si la IP tiene suerte
         info = t.info
-        if info and len(info) > 5 and ('trailingPE' in info or 'forwardPE' in info or 'netIncomeToCommon' in info):
+        
+        # Si Yahoo devuelve la info de forma nativa sin bloquear, la usamos
+        if info and 'profitMargins' in info:
             return info
             
-        # Plan B (Anticipando el bloqueo): Extraemos métricas clave de los estados financieros reales
-            
+        # PLAN B: Si la nube de Streamlit es bloqueada, calculamos todo manualmente
         fin = t.financials
         bs = t.balance_sheet
         
         data = {}
         if not fin.empty and not bs.empty:
-            # Tomamos el último año disponible
-            latest_col = fin.columns[0]
-            bs_col = bs.columns[0] if bs.columns[0] in bs.columns else bs.columns[0]
-            
+            # 1. Extracción de valores en crudo desde los balances
             net_income = fin.loc['Net Income'].iloc[0] if 'Net Income' in fin.index else 0
-            total_revenue = fin.loc['Total Revenue'].iloc[0] if 'Total Revenue' in fin.index else 1
-            operating_income = fin.loc['Operating Income'].iloc[0] if 'Operating Income' in fin.index else 0
+            revenue = fin.loc['Total Revenue'].iloc[0] if 'Total Revenue' in fin.index else 1
+            op_income = fin.loc['Operating Income'].iloc[0] if 'Operating Income' in fin.index else 0
             
-            total_cash = bs.loc['Cash And Cash Equivalents'].iloc[0] if 'Cash And Cash Equivalents' in bs.index else (bs.loc['Cash Cash Equivalents And Short Term Investments'].iloc[0] if 'Cash Cash Equivalents And Short Term Investments' in bs.index else 0)
             total_debt = bs.loc['Total Debt'].iloc[0] if 'Total Debt' in bs.index else 0
-            stockholders_equity = bs.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in bs.index else 1
-            total_assets = bs.loc['Total Assets'].iloc[0] if 'Total Assets' in bs.index else 1
+            equity = bs.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in bs.index else 1
+            assets = bs.loc['Total Assets'].iloc[0] if 'Total Assets' in bs.index else 1
             
-            # Estimaciones derivadas seguras
-            data['netIncomeToCommon'] = net_income
-            data['operatingMargins'] = operating_income / total_revenue if total_revenue else 0
-            data['totalCash'] = total_cash
+            curr_assets = bs.loc['Current Assets'].iloc[0] if 'Current Assets' in bs.index else 0
+            curr_liab = bs.loc['Current Liabilities'].iloc[0] if 'Current Liabilities' in bs.index else 1
+            cash = bs.loc['Cash And Cash Equivalents'].iloc[0] if 'Cash And Cash Equivalents' in bs.index else 0
+            
+            # Calculamos el PER usando fast_info (un endpoint V8 que Yahoo casi nunca bloquea)
+            try:
+                mcap = t.fast_info.market_cap
+                pe = mcap / net_income if net_income > 0 else 0
+            except:
+                pe = 0
+
+            # Calculamos el Crecimiento de Ingresos interanual (Revenue Growth)
+            try:
+                rev_prev = fin.loc['Total Revenue'].iloc[1]
+                rev_growth = (revenue - rev_prev) / rev_prev if rev_prev else 0
+            except:
+                rev_growth = 0
+
+            # 2. Mapeo con los nombres EXACTOS que busca tu tabla y tu motor de puntajes
+            data['forwardPE'] = pe
+            data['returnOnEquity'] = net_income / equity if equity != 1 else 0
+            data['returnOnAssets'] = net_income / assets if assets != 1 else 0
+            data['profitMargins'] = net_income / revenue if revenue != 1 else 0
+            data['operatingMargins'] = op_income / revenue if revenue != 1 else 0
+            data['debtToEquity'] = (total_debt / equity) * 100 if equity != 1 else 0
+            data['currentRatio'] = curr_assets / curr_liab if curr_liab != 1 else 0
+            data['totalCash'] = cash
             data['totalDebt'] = total_debt
-            data['returnOnEquity'] = net_income / stockholders_equity if stockholders_equity else 0
-            data['returnOnAssets'] = net_income / total_assets if total_assets else 0
-            data['debtToEquity'] = (total_debt / stockholders_equity) * 100 if stockholders_equity else 0
+            data['revenueGrowth'] = rev_growth
             
         return data
     except:
